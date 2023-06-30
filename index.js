@@ -18,7 +18,11 @@ app.use(express.json());
 app.use(express.static('site'));
 
 app.use(function(req, res, next) {
-  res.setHeader("Access-Control-Allow-Origin", "https://thegaehive.fizzyizzy.repl.co");
+  let allowedlist = ["https://thegaehive.fizzyizzy.repl.co", "https://gaehive.vercel.app"]
+  let origin = req.headers.origin;
+  let allowedorigins = (allowedlist.indexOf(origin) >= 0) ? origin : allowedlist[0];
+  
+  res.setHeader("Access-Control-Allow-Origin", allowedorigins);
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
   next();
@@ -51,11 +55,15 @@ app.get('/db/queue', (req, res) => {
 app.put('/db/managers/add', express.json(), async (req, res) => {
   let username = req.body.username;
   let id = req.body.id;
-  
-  const replData = {
-    name: username,
-    id: id
-  }
+  let token = req.body.token;
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
+    
+    if(complete.manager == "true"){
+      const replData = {
+      name: username,
+      id: id
+    }
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
   const qu = JSON.parse(fs.readFileSync("queue.json"));
@@ -68,10 +76,18 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
   fs.writeFileSync("users.json", JSON.stringify(dt));
   fs.writeFileSync("queue.json", JSON.stringify(qu));
   return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }});
 });
 
 app.put('/db/managers/remove', express.json(), async (req, res) => {
   let username = req.body.username;
+  let token = req.body.token;
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
+    
+    if(complete.manager == "true"){
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
   const qu = JSON.parse(fs.readFileSync("queue.json"));
@@ -89,6 +105,9 @@ app.put('/db/managers/remove', express.json(), async (req, res) => {
   fs.writeFileSync("users.json", JSON.stringify(dt));
   fs.writeFileSync("queue.json", JSON.stringify(qu));
   return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }});
 });
 
 app.get('/api/:section', (req, res) => {
@@ -124,14 +143,15 @@ app.post('/login', async (req, res) => {
     
   for ( var i = 0; i < dt.length; i++ ) {
     if (dt[i].name == json.username) {
-      manager = "true"
+      manager = "true";
+      break;
     } else {
       manager = "false"
     }
   }
   
   if (json.valid) {
-    const token = jwt.sign({ name: json.username }, process.env['SECRET'], { expiresIn: '20 days' });
+    const token = jwt.sign({ name: json.username, manager: manager }, process.env['SECRET'], { expiresIn: '20 days' });
     
     return res.json({ token: token, username: json.username, id: userdata.id, manager: manager}) 
   } else {
