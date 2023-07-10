@@ -3,11 +3,8 @@ const express = require('express');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser')
-const Database = require("@replit/database")
 const path = require('path');
 const fs = require("fs-extra");
-const db = new Database()
-
 
 // Create a new Express application
 const app = express();
@@ -18,7 +15,7 @@ app.use(express.json());
 app.use(express.static('site'));
 
 app.use(function(req, res, next) {
-  let allowedlist = ["https://thegaehive.fizzyizzy.repl.co", "https://gaehive.vercel.app"]
+  let allowedlist = ["https://gaehive.vercel.app", "https://thegaehive.fizzyizzy.repl.co"]
   let origin = req.headers.origin;
   let allowedorigins = (allowedlist.indexOf(origin) >= 0) ? origin : allowedlist[0];
   
@@ -37,29 +34,36 @@ const cookieOptions = {
   maxAge: 20 * 24 * 3600 * 1000  // The cookie expires in 20 days
 };
 
-// The index page is a simple welcome, with a link to /auth
+// The index page is a simple welcome.
 app.get('/', (req, res) => {
   res.json({"message": "Hello! Welcome to the backend for The Gaehive Site ✨"})
 });
 
+// Where the list of managers is requested.
 app.get('/db/managers', (req, res) => {
   res.header("Content-Type",'application/json');
   res.sendFile(path.join(__dirname, 'users.json'));
 });
 
+// Where the order of the hosts is requested.
 app.get('/db/queue', (req, res) => {
   res.header("Content-Type",'application/json');
   res.sendFile(path.join(__dirname, 'queue.json'));
 });
 
+// Requests to here add managers to the list.
 app.put('/db/managers/add', express.json(), async (req, res) => {
   let username = req.body.username;
-  let id = req.body.id;
   let token = req.body.token;
+
+  const userinfo = await fetch('https://scratchdb.lefty.one/v3/user/info/' + username);
+
+  const data = await userinfo.json();
+  const id = data.id;
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
     
-    if(complete.manager == "true"){
+    if(complete.manager == "true" && id && id !== null){
       const replData = {
       name: username,
       id: id
@@ -81,6 +85,7 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
   }});
 });
 
+// Requests to here remove managers from the list.
 app.put('/db/managers/remove', express.json(), async (req, res) => {
   let username = req.body.username;
   let token = req.body.token;
@@ -110,26 +115,39 @@ app.put('/db/managers/remove', express.json(), async (req, res) => {
   }});
 });
 
-app.get('/api/:section', (req, res) => {
-  var section = req.params.section;
-  db.get(section).then(function(value) {
-  res.json(
-    { "name": section, "status": value }
+
+app.put('/hivezine/add', express.json(), async (req, res) => {
+  let content = req.body.content;
+  let token = req.body.token;
+
+  const postdata = await fetch('https://gaehive.vercel.app/api/hivezine')
+        const post = await postdata.json()
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
     
-    );
-  })
+    if(complete.manager == "true" && complete.name == post[0].author.username){
+      const replData = {
+      post: content
+    }
+
+
+
+  fs.writeFileSync("hivezine/#1.json", JSON.stringify(post));
+  return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }});
 });
 
-app.get('/user/:section', (req, res) => {
-  var section = req.params.section + "-bio";
-  db.get(section).then(function(value) {
-  res.json(
-    { "name": section, "bio": value }
-    
-    );
-  })
+app.get('/hivezine/:post', (req, res) => {
+  var post = req.params.post
+  res.header("Content-Type",'application/json');
+  res.sendFile(path.join(__dirname, 'hivezine/#' + post + ".json"));
 });
 
+
+
+// Where login verification occurs.
 app.post('/login', async (req, res) => {
   const result = await fetch('https://auth.itinerary.eu.org/api/auth/verifyToken?privateCode=' + req.body.privateCode);
   const json = await result.json();
@@ -159,7 +177,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// The /auth route
+// The /login route.
 app.get('/login', async (req, res) => {
   if (req.query.privateCode) {
     res.redirect('https://thegaehive.fizzyizzy.repl.co/login?privateCode=' + req.query.privateCode)
@@ -177,23 +195,3 @@ app.listen(8080, () => {
   console.log('server started');
 });
 
-setInterval(showTime, 1000);
-  function showTime() {
-      let time = new Date();
-      let hour = time.getHours();
-      let min = time.getMinutes();
-      let sec = time.getSeconds();
-
-    if (hour == 12 && min == 0 && sec == 0) {
-      db.list().then(keys => {
-          const users = keys.toString().split(",");
-          users.forEach(setOffline);
-      
-      function setOffline(item) {
-        db.set(item, "Offline"); 
-      }
-    })
-  }
-}
-
-  showTime();
