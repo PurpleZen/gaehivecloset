@@ -1,4 +1,4 @@
-name: Keep Alive
+name: Keep Repl Online
 on:
   schedule:
     - cron: '*/10 * * * *'
