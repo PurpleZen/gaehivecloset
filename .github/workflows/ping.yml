@@ -1,0 +1,26 @@
+name: Keep Alive
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  Ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: Keep Workflow Enabled
+        run: |
+          date > workflow-alive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "*knocks on closet door*"
+          git push
+
+      - name: Curl URL
+        run: |
+          # Your Repl site link goes here ↓
+          curl -s -S --retry 2 https://gaehivecloset.fizzyizzy.repl.co/
