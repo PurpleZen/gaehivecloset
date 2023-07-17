@@ -25,15 +25,6 @@ app.use(function(req, res, next) {
   next();
 });
 
-// Our default cookie options
-const cookieOptions = {
-  path: '/',                // Send the cookie to all routes
-  httpOnly: true,           // Make the cookie not accessible by document.cookie
-  sameSite: 'lax',          // Allow incoming links (but not requests) to include the cookie
-  secure: true,             // Make sure the cookie is secure
-  maxAge: 20 * 24 * 3600 * 1000  // The cookie expires in 20 days
-};
-
 // The index page is a simple welcome.
 app.get('/', (req, res) => {
   res.json({"message": "Hello! Welcome to the backend for The Gaehive Site ✨"})
@@ -43,12 +34,6 @@ app.get('/', (req, res) => {
 app.get('/db/managers', (req, res) => {
   res.header("Content-Type",'application/json');
   res.sendFile(path.join(__dirname, 'users.json'));
-});
-
-// Where the order of the hosts is requested.
-app.get('/db/queue', (req, res) => {
-  res.header("Content-Type",'application/json');
-  res.sendFile(path.join(__dirname, 'queue.json'));
 });
 
 // Requests to here add managers to the list.
@@ -62,7 +47,8 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
   const id = data.id;
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
-    
+
+    // This ensures you have permisson to do this, and that the user you want to add exists on Scratch.
     if(complete.manager == "true" && id && id !== null){
       const replData = {
       name: username,
@@ -70,15 +56,10 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
     }
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
-  const qu = JSON.parse(fs.readFileSync("queue.json"));
-
-  let ql = qu.data.length
-  qu.data.splice(1, 0, ql);
   
-  dt.push(replData);
-
+  dt.splice(1, 0, replData);
+  
   fs.writeFileSync("users.json", JSON.stringify(dt));
-  fs.writeFileSync("queue.json", JSON.stringify(qu));
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
@@ -95,20 +76,40 @@ app.put('/db/managers/remove', express.json(), async (req, res) => {
     if(complete.manager == "true"){
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
-  const qu = JSON.parse(fs.readFileSync("queue.json"));
-
-  let rm = qu.data.length - 1
-  let rmi = qu.data.indexOf(rm)
     
   for ( var i = 0; i < dt.length; i++ ) {
     if (dt[i].name == username) {
       dt.splice(i, 1)
-      qu.data.splice(rmi, 1)
     }
   }
 
   fs.writeFileSync("users.json", JSON.stringify(dt));
-  fs.writeFileSync("queue.json", JSON.stringify(qu));
+  return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }});
+});
+
+
+app.put('/db/managers/edit', express.json(), async (req, res) => {
+  let username = req.body.username;
+  let pos = req.body.position;
+  let token = req.body.token;
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
+    
+    if(complete.manager == "true"){
+
+  const dt = JSON.parse(fs.readFileSync("users.json"));
+    
+  for ( var i = 0; i < dt.length; i++ ) {
+    if (dt[i].name == username) {
+      let moved = dt.splice(i, 1)
+      dt.splice(pos, 0, moved[0])
+    }
+  }
+
+  fs.writeFileSync("users.json", JSON.stringify(dt));
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
@@ -121,30 +122,60 @@ app.put('/hivezine/add', express.json(), async (req, res) => {
   let token = req.body.token;
 
   const postdata = await fetch('https://gaehive.vercel.app/api/hivezine')
-        const post = await postdata.json()
+  const post = await postdata.json()
+  
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
     
-    if(complete.manager == "true" && complete.name == post[0].author.username){
-      const replData = {
-      post: content
-    }
+    if(complete.manager == "true" && complete.name == post[0].user){
 
+    const list = JSON.parse(fs.readFileSync("hivezine/list.json"));
+    post[0].id = list.data.length
+    let listl = list.data.length
+    list.data.splice(0, 0, listl);
 
+    fs.writeFileSync("hivezine/list.json", JSON.stringify(list));
 
-  fs.writeFileSync("hivezine/#1.json", JSON.stringify(post));
+  fs.writeFileSync("hivezine/#" + listl + ".json", JSON.stringify(post));
+      
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
   }});
 });
 
-app.get('/hivezine/:post', (req, res) => {
+app.put('/hivezine/delete', express.json(), async (req, res) => {
+  let id = req.body.id;
+  let token = req.body.token;
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
+    
+    if(complete.manager == "true"){
+
+    fs.writeFileSync("hivezine/#" + id + ".json", "[]");
+      
+  return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }});
+});
+
+app.get('/hivezine/post/:post', (req, res) => {
   var post = req.params.post
   res.header("Content-Type",'application/json');
   res.sendFile(path.join(__dirname, 'hivezine/#' + post + ".json"));
 });
 
+app.get('/hivezine/list', (req, res) => {
+  res.header("Content-Type",'application/json');
+  const posts = JSON.parse(fs.readFileSync("hivezine/list.json"));
+  var list = JSON.parse(fs.readFileSync("hivezine/#0.json"))
+  for ( var i = 1; i < posts.data.length; i++ ) {
+    list = list.concat(JSON.parse(fs.readFileSync("hivezine/#" + i + ".json")))
+  }
+  
+  res.send(list);
+});
 
 
 // Where login verification occurs.
@@ -190,8 +221,8 @@ app.get('/login', async (req, res) => {
   }
 });
 
-// Start the server on port 3000
+// Start the server
 app.listen(8080, () => {
-  console.log('server started');
+  console.log('*opens closet door*');
 });
 
