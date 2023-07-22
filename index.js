@@ -2,7 +2,6 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser')
 const path = require('path');
 const fs = require("fs-extra");
 
@@ -48,6 +47,9 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
 
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
     // This ensures you have permisson to do this, and that the user you want to add exists on Scratch.
     if(complete.manager == "true" && id && id !== null){
       const replData = {
@@ -63,7 +65,7 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
-  }});
+  }}});
 });
 
 // Requests to here remove managers from the list.
@@ -72,7 +74,10 @@ app.put('/db/managers/remove', express.json(), async (req, res) => {
   let token = req.body.token;
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
-    
+
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
     if(complete.manager == "true"){
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
@@ -87,7 +92,7 @@ app.put('/db/managers/remove', express.json(), async (req, res) => {
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
-  }});
+  }}});
 });
 
 
@@ -97,7 +102,10 @@ app.put('/db/managers/edit', express.json(), async (req, res) => {
   let token = req.body.token;
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
-    
+
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
     if(complete.manager == "true"){
 
   const dt = JSON.parse(fs.readFileSync("users.json"));
@@ -113,7 +121,7 @@ app.put('/db/managers/edit', express.json(), async (req, res) => {
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
-  }});
+  }}});
 });
 
 
@@ -126,7 +134,10 @@ app.put('/hivezine/add', express.json(), async (req, res) => {
   
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
-    
+
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
     if(complete.manager == "true" && complete.name == post[0].user){
 
     const list = JSON.parse(fs.readFileSync("hivezine/list.json"));
@@ -141,7 +152,7 @@ app.put('/hivezine/add', express.json(), async (req, res) => {
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
-  }});
+  }}});
 });
 
 app.put('/hivezine/delete', express.json(), async (req, res) => {
@@ -149,7 +160,10 @@ app.put('/hivezine/delete', express.json(), async (req, res) => {
   let token = req.body.token;
 
   jwt.verify(token,process.env['SECRET'],(err,complete)=>{
-    
+
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
     if(complete.manager == "true"){
 
     fs.writeFileSync("hivezine/#" + id + ".json", "[]");
@@ -157,7 +171,27 @@ app.put('/hivezine/delete', express.json(), async (req, res) => {
   return res.json({ ok: "done"}) 
   } else { 
     return res.json({ error: "access denied"})
-  }});
+  }}});
+});
+
+app.put('/hivezine/pin', express.json(), async (req, res) => {
+  let id = req.body.id;
+  let token = req.body.token;
+
+  jwt.verify(token,process.env['SECRET'],(err,complete)=>{
+
+    if (err) {
+      return res.json({ error: "token expired"})
+    } else {
+    if(complete.manager == "true"){
+
+    const post = fs.readFileSync("hivezine/#" + id + ".json");
+    fs.writeFileSync("hivezine/pin.json", post);
+      
+  return res.json({ ok: "done"}) 
+  } else { 
+    return res.json({ error: "access denied"})
+  }}});
 });
 
 app.get('/hivezine/post/:post', (req, res) => {
@@ -177,14 +211,15 @@ app.get('/hivezine/list', (req, res) => {
   res.send(list);
 });
 
+app.get('/hivezine/pin', (req, res) => {
+  res.header("Content-Type",'application/json');  res.sendFile(path.join(__dirname, "hivezine/pin.json"));
+});
+
 
 // Where login verification occurs.
 app.post('/login', async (req, res) => {
   const result = await fetch('https://auth.itinerary.eu.org/api/auth/verifyToken?privateCode=' + req.body.privateCode);
   const json = await result.json();
-  
-  const user = await fetch('https://scratchdb.lefty.one/v3/user/info/' + json.username);
-  const userdata = await user.json();
   
   const dt = JSON.parse(fs.readFileSync("users.json"));
     
@@ -200,24 +235,11 @@ app.post('/login', async (req, res) => {
   }
   
   if (json.valid) {
-    const token = jwt.sign({ name: json.username, manager: manager }, process.env['SECRET'], { expiresIn: '20 days' });
+    const token = jwt.sign({ name: json.username, manager: manager }, process.env['SECRET'], { expiresIn: '1 day' });
     
-    return res.json({ token: token, username: json.username, id: userdata.id, manager: manager}) 
+    return res.json({ token: token, username: json.username, manager: manager}) 
   } else {
     return res.json({ token: "invalid" })
-  }
-});
-
-// The /login route.
-app.get('/login', async (req, res) => {
-  if (req.query.privateCode) {
-    res.redirect('https://thegaehive.fizzyizzy.repl.co/login?privateCode=' + req.query.privateCode)
-  } else {
-    res.redirect(
-      'https://auth.itinerary.eu.org/auth/?redirect=' +
-      Buffer.from('https://gaehivecloset.fizzyizzy.repl.co/login').toString('base64') +
-      '&name=the Gaehive website&authProject=867214083'
-    );
   }
 });
 
