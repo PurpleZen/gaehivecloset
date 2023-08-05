@@ -132,12 +132,14 @@ app.put('/db/managers/edit', express.json(), async (req, res) => {
 
 
 app.put('/hivezine/add', express.json(), async (req, res) => {
-  let content = req.body.content;
   let token = req.body.token;
 
   const postdata = await fetch('https://gaehive.vercel.app/api/hivezine')
   const post = await postdata.json()
 
+  if (post.error) {
+    return res.json({ error: "too many requests" })
+  } else {
 
   jwt.verify(token, process.env['SECRET'], (err, complete) => {
 
@@ -161,7 +163,7 @@ app.put('/hivezine/add', express.json(), async (req, res) => {
       }
     }
   });
-});
+}});
 
 app.put('/hivezine/delete', express.json(), async (req, res) => {
   let id = req.body.id;
@@ -206,6 +208,37 @@ app.put('/hivezine/pin', express.json(), async (req, res) => {
   });
 });
 
+app.put('/hivezine/react', express.json(), async (req, res) => {
+  let username = req.body.username;
+  let type = req.body.type;
+  let id = req.body.id;
+  let token = req.body.token;
+
+  jwt.verify(token, process.env['SECRET'], (err, complete) => {
+
+    if (err) {
+      return res.json({ error: "token expired" })
+    } else {
+      const react = JSON.parse(fs.readFileSync("hivezine/#" + id + ".json"));
+      if (react[0][type]) {
+        react[0][type] = react[0][type] + 1
+      } else {
+        react[0][type] = 1
+      }
+      
+      let by = type + "by"
+      if (react[0][by]) {
+        react[0][by].splice(0, 0, username)
+      } else {
+        react[0][by] = [username]
+      }
+      
+      fs.writeFileSync("hivezine/#" + id + ".json", JSON.stringify(react));
+      return res.json({ ok: "done" })
+    }
+  })
+});
+
 app.get('/hivezine/post/:post', (req, res) => {
   var post = req.params.post
   res.header("Content-Type", 'application/json');
@@ -215,9 +248,13 @@ app.get('/hivezine/post/:post', (req, res) => {
 app.get('/hivezine/list', (req, res) => {
   res.header("Content-Type", 'application/json');
   const posts = JSON.parse(fs.readFileSync("hivezine/list.json"));
-  var list = JSON.parse(fs.readFileSync("hivezine/#0.json"))
-  for (var i = 1; i < posts.data.length; i++) {
+  
+  for (var i = posts.data.length - 1; i >= 0; i--) {
+    if (!list) {
+      var list = JSON.parse(fs.readFileSync("hivezine/#" + i + ".json"))
+    } else {
     list = list.concat(JSON.parse(fs.readFileSync("hivezine/#" + i + ".json")))
+    }
   }
 
   res.send(list);
@@ -225,6 +262,73 @@ app.get('/hivezine/list', (req, res) => {
 
 app.get('/hivezine/pin', (req, res) => {
   res.header("Content-Type", 'application/json'); res.sendFile(path.join(__dirname, "hivezine/pin.json"));
+});
+
+app.get('/hivezine/writers', (req, res) => {
+  res.header("Content-Type", 'application/json');
+  res.sendFile(path.join(__dirname, 'writers.json'));
+});
+
+app.put('/hivezine/writers/add', express.json(), async (req, res) => {
+  let username = req.body.username;
+  let token = req.body.token;
+
+  const userinfo = await fetch('https://scratchdb.lefty.one/v3/user/info/' + username);
+
+  const data = await userinfo.json();
+  const id = data.id;
+
+  jwt.verify(token, process.env['SECRET'], (err, complete) => {
+
+    if (err) {
+      return res.json({ error: "token expired" })
+    } else {
+      // This ensures you have permisson to do this, and that the user you want to add exists on Scratch.
+      if (complete.manager == "true" || complete.admin == "true" || complete.writer == "true" && id && id !== null) {
+        const replData = {
+          name: username,
+          id: id
+        }
+
+        const dt = JSON.parse(fs.readFileSync("writers.json"));
+
+        dt.splice(0, 0, replData);
+
+        fs.writeFileSync("writers.json", JSON.stringify(dt));
+        return res.json({ ok: "done" })
+      } else {
+        return res.json({ error: "access denied" })
+      }
+    }
+  });
+});
+
+app.put('/hivezine/writers/remove', express.json(), async (req, res) => {
+  let username = req.body.username;
+  let token = req.body.token;
+
+  jwt.verify(token, process.env['SECRET'], (err, complete) => {
+
+    if (err) {
+      return res.json({ error: "token expired" })
+    } else {
+      if (complete.manager == "true" || complete.admin == "true" || complete.writer == "true") {
+
+        const dt = JSON.parse(fs.readFileSync("writers.json"));
+
+        for (var i = 0; i < dt.length; i++) {
+          if (dt[i].name == username) {
+            dt.splice(i, 1)
+          }
+        }
+
+        fs.writeFileSync("writers.json", JSON.stringify(dt));
+        return res.json({ ok: "done" })
+      } else {
+        return res.json({ error: "access denied" })
+      }
+    }
+  });
 });
 
 
