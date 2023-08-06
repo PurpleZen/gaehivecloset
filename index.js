@@ -1,18 +1,19 @@
-// Require the dependencies
+// Require the dependencies.
 const express = require('express');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require("fs-extra");
 
-// Create a new Express application
+// Create a new Express application.
 const app = express();
 
-// Calling the express.json() method for parsing
+// Calling the express.json() method for parsing.
 app.use(express.json());
 
 app.use(express.static('site'));
 
+// Configure. CORS
 app.use(function(req, res, next) {
   let allowedlist = ["https://gaehive.vercel.app", "https://thegaehive.fizzyizzy.repl.co"]
   let origin = req.headers.origin;
@@ -50,7 +51,6 @@ app.put('/db/managers/add', express.json(), async (req, res) => {
     if (err) {
       return res.json({ error: "token expired" })
     } else {
-      // This ensures you have permisson to do this, and that the user you want to add exists on Scratch.
       if (complete.manager == "true" || complete.admin == "true" && id && id !== null) {
         const replData = {
           name: username,
@@ -130,7 +130,7 @@ app.put('/db/managers/edit', express.json(), async (req, res) => {
   });
 });
 
-
+// Requests to here add new Hivezine posts.
 app.put('/hivezine/add', express.json(), async (req, res) => {
   let token = req.body.token;
 
@@ -165,6 +165,7 @@ app.put('/hivezine/add', express.json(), async (req, res) => {
   });
 }});
 
+// Requests to here delete Hivezine posts.
 app.put('/hivezine/delete', express.json(), async (req, res) => {
   let id = req.body.id;
   let token = req.body.token;
@@ -186,6 +187,7 @@ app.put('/hivezine/delete', express.json(), async (req, res) => {
   });
 });
 
+// Requests to here pin Hivezine posts.
 app.put('/hivezine/pin', express.json(), async (req, res) => {
   let id = req.body.id;
   let token = req.body.token;
@@ -208,6 +210,7 @@ app.put('/hivezine/pin', express.json(), async (req, res) => {
   });
 });
 
+// Requests to here add reactions to posts.
 app.put('/hivezine/react', express.json(), async (req, res) => {
   let username = req.body.username;
   let type = req.body.type;
@@ -239,12 +242,14 @@ app.put('/hivezine/react', express.json(), async (req, res) => {
   })
 });
 
+// Where single posts are requested.
 app.get('/hivezine/post/:post', (req, res) => {
   var post = req.params.post
   res.header("Content-Type", 'application/json');
   res.sendFile(path.join(__dirname, 'hivezine/#' + post + ".json"));
 });
 
+// Where all posts are requested.
 app.get('/hivezine/list', (req, res) => {
   res.header("Content-Type", 'application/json');
   const posts = JSON.parse(fs.readFileSync("hivezine/list.json"));
@@ -260,15 +265,18 @@ app.get('/hivezine/list', (req, res) => {
   res.send(list);
 });
 
+// Where the pinned post is requested.
 app.get('/hivezine/pin', (req, res) => {
   res.header("Content-Type", 'application/json'); res.sendFile(path.join(__dirname, "hivezine/pin.json"));
 });
 
+// Where the writers are requested.
 app.get('/hivezine/writers', (req, res) => {
   res.header("Content-Type", 'application/json');
   res.sendFile(path.join(__dirname, 'writers.json'));
 });
 
+// Requests to here add new writers.
 app.put('/hivezine/writers/add', express.json(), async (req, res) => {
   let username = req.body.username;
   let token = req.body.token;
@@ -283,7 +291,6 @@ app.put('/hivezine/writers/add', express.json(), async (req, res) => {
     if (err) {
       return res.json({ error: "token expired" })
     } else {
-      // This ensures you have permisson to do this, and that the user you want to add exists on Scratch.
       if (complete.manager == "true" || complete.admin == "true" || complete.writer == "true" && id && id !== null) {
         const replData = {
           name: username,
@@ -303,6 +310,7 @@ app.put('/hivezine/writers/add', express.json(), async (req, res) => {
   });
 });
 
+//Requests to here remove writers.
 app.put('/hivezine/writers/remove', express.json(), async (req, res) => {
   let username = req.body.username;
   let token = req.body.token;
