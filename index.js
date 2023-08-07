@@ -341,8 +341,8 @@ app.put('/hivezine/writers/remove', express.json(), async (req, res) => {
 
 
 // Where login verification occurs.
-app.post('/login', async (req, res) => {
-  const result = await fetch('https://auth.itinerary.eu.org/api/auth/verifyToken?privateCode=' + req.body.privateCode);
+app.get('/login/:code', async (req, res) => {
+  const result = await fetch('https://auth.itinerary.eu.org/api/auth/verifyToken?privateCode=' + req.params.code);
   const json = await result.json();
 
 
