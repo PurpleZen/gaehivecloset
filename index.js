@@ -27,7 +27,7 @@ app.use(function(req, res, next) {
 
 // The index page is a simple welcome.
 app.get('/', (req, res) => {
-  res.json({ "message": "Hello! Welcome to the backend for The Gaehive Site ✨" })
+  res.json({ "message": "Hello! Welcome to the backend for The Gaehive Website ✨" })
 });
 
 // Where the list of managers is requested.
